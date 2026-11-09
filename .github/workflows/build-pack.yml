@@ -1,0 +1,84 @@
+# Builds Zero Hour Reforged v3.6.0 from the original repository, builds the LAN launcher, and puts
+# both into one download: the "ZH-LAN-Pack" artifact on the run's page (Actions > the run > Artifacts).
+# Start it from the Actions tab with "Run workflow". About 15-25 minutes.
+name: Build LAN pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Reforged tag to build (3.6.0 is the last one that loads mods)
+        default: v3.6.0
+        required: true
+
+jobs:
+  pack:
+    # Pinned: build.bat at v3.6.0 looks for Visual Studio 2022, which this image carries.
+    runs-on: windows-2022
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check out this repository (launcher and pack template)
+        uses: actions/checkout@v4
+        with:
+          path: self
+
+      - name: Check out Reforged ${{ inputs.tag }}
+        uses: actions/checkout@v4
+        with:
+          repository: olcayseygan/CnCGeneralsZH-Reforged
+          ref: ${{ inputs.tag }}
+          path: reforged
+          fetch-depth: 1
+
+      - name: Build the game (build.bat Release generals)
+        shell: cmd
+        working-directory: reforged
+        run: build.bat Release generals
+
+      - name: Build the launcher
+        shell: pwsh
+        run: |
+          $fw = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $csc = & $vswhere -latest -find 'MSBuild\Current\Bin\Roslyn\csc.exe' | Select-Object -First 1
+          if (-not $csc) { throw 'csc.exe not found' }
+          $refs = 'System.dll','System.Core.dll','System.Drawing.dll','System.Windows.Forms.dll',
+                  'System.Runtime.Serialization.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll' |
+                  ForEach-Object { "/r:$fw\$_" }
+          & $csc /nologo /target:winexe /platform:anycpu /optimize+ /langversion:6 `
+                 /win32icon:self\launcher\zh.ico /out:ZHLauncher.exe $refs self\launcher\src\*.cs
+          if ($LASTEXITCODE) { throw 'launcher build failed' }
+
+      - name: Put the pack together
+        shell: pwsh
+        run: |
+          $run = 'reforged\GeneralsMD\Run'
+          if (-not (Test-Path "$run\generals.exe")) { throw "build.bat left no generals.exe in $run" }
+
+          # the game build: everything build.bat put in Run, without debug symbols
+          New-Item -ItemType Directory game | Out-Null
+          robocopy $run game /E /XF *.pdb *.ilk place_steam_build_here.txt /NFL /NDL /NJH /NJS /NP
+          if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
+          $global:LASTEXITCODE = 0
+
+          New-Item -ItemType Directory pack\build | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory("$PWD\game", "$PWD\pack\build\Reforged-$env:TAG.zip",
+              [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+          Copy-Item ZHLauncher.exe pack\
+          Copy-Item self\pack-template\pack.json pack\
+          Copy-Item self\pack-template\mods pack\mods -Recurse
+          (Get-Content pack\pack.json -Raw).Replace('v3.6.0', $env:TAG) | Set-Content pack\pack.json -NoNewline
+
+          Get-ChildItem pack -Recurse -File | ForEach-Object { '{0,12:N0}  {1}' -f $_.Length, $_.FullName.Substring($PWD.Path.Length + 1) }
+
+      - name: Upload ZH-LAN-Pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZH-LAN-Pack-${{ inputs.tag }}
+          path: pack
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
