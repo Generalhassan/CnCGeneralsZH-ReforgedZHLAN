@@ -1,0 +1,184 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Windows.Forms;
+
+namespace ZHLauncher
+{
+    class SettingsForm : Form
+    {
+        readonly Engine engine;
+        TextBox zh, gen, extra;
+        Label zhState, genState, baseState;
+        Button copy;
+        public bool CopyRequested;
+
+        public SettingsForm(Engine engine)
+        {
+            this.engine = engine;
+            Text = "Settings";
+            BackColor = Theme.Panel;
+            ForeColor = Theme.Text;
+            Font = Theme.Ui(9.75f);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            ClientSize = new Size(720, 470);
+
+            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(20, 16, 20, 16), BackColor = Theme.Panel };
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            int row = 0;
+            Action<Control, int, int> add = (c, col, span) => { t.Controls.Add(c, col, row); if (span > 1) t.SetColumnSpan(c, span); };
+
+            var intro = Theme.Label("The launcher plays from its own copy of Zero Hour, so your Steam or EA install and the official Reforged launcher are left alone. " +
+                                    "The copy has to be made once on every PC.", 9.75f, FontStyle.Regular, Theme.Muted);
+            intro.MaximumSize = new Size(670, 0);
+            intro.Margin = new Padding(0, 0, 0, 14);
+            add(intro, 0, 3); row++;
+
+            add(Lbl("Zero Hour folder"), 0, 1);
+            zh = Theme.TextBox(); zh.Dock = DockStyle.Fill; zh.Text = engine.Settings.ZeroHourPath ?? "";
+            zh.TextChanged += (s, e) => Check();
+            add(zh, 1, 1);
+            var zhButtons = Row(Theme.Button("Browse..."), Theme.Button("Find"));
+            zhButtons.Controls[0].Click += (s, e) => Browse(zh, "The Zero Hour folder: the one with INIZH.big in it");
+            zhButtons.Controls[1].Click += (s, e) => Find();
+            add(zhButtons, 2, 1); row++;
+            zhState = Theme.Label("", 9f); add(zhState, 1, 2); row++;
+
+            add(Lbl("Generals folder"), 0, 1);
+            gen = Theme.TextBox(); gen.Dock = DockStyle.Fill; gen.Text = engine.Settings.GeneralsPath ?? "";
+            gen.TextChanged += (s, e) => Check();
+            add(gen, 1, 1);
+            var genButtons = Row(Theme.Button("Browse..."));
+            genButtons.Controls[0].Click += (s, e) => Browse(gen, "The original Generals folder: the one with Textures.big in it");
+            add(genButtons, 2, 1); row++;
+            genState = Theme.Label("", 9f); add(genState, 1, 2); row++;
+
+            add(Lbl("Extra arguments"), 0, 1);
+            extra = Theme.TextBox(); extra.Dock = DockStyle.Fill; extra.Text = engine.Settings.ExtraArgs ?? "";
+            add(extra, 1, 2); row++;
+            var extraHint = Theme.Label("Just for this PC, e.g. -win for a window. The pack can add its own for everyone.", 9f, FontStyle.Regular, Theme.Muted);
+            add(extraHint, 1, 2); row++;
+
+            add(Lbl("On this PC"), 0, 1);
+            baseState = Theme.Label("", 9f);
+            baseState.MaximumSize = new Size(440, 0);
+            add(baseState, 1, 1);
+            var dataButtons = Row(Theme.Button("Open"));
+            dataButtons.Controls[0].Click += (s, e) => { try { Process.Start(new ProcessStartInfo(engine.DataRoot) { UseShellExecute = true }); } catch { } };
+            add(dataButtons, 2, 1); row++;
+
+            var spacer = new Panel { Height = 10, Dock = DockStyle.Fill, BackColor = Theme.Panel };
+            int spacerRow = row;
+            add(spacer, 0, 3); row++;
+
+            copy = Theme.Button("Copy Zero Hour into the launcher", true);
+            copy.Font = Theme.Ui(10.5f, FontStyle.Bold);
+            copy.AutoSize = true;
+            copy.Padding = new Padding(14, 8, 14, 8);
+            copy.Click += (s, e) => { if (Save(true)) { CopyRequested = true; DialogResult = DialogResult.OK; } };
+            var save = Theme.Button("Save");
+            save.Click += (s, e) => { if (Save(false)) DialogResult = DialogResult.OK; };
+            var cancel = Theme.Button("Cancel");
+            cancel.DialogResult = DialogResult.Cancel;
+            CancelButton = cancel;
+            var bottom = Row(copy, save, cancel);
+            bottom.Anchor = AnchorStyles.Right;
+            add(bottom, 0, 3); row++;
+
+            t.RowCount = row;
+            for (int i = 0; i < row; i++)
+                t.RowStyles.Add(i == spacerRow ? new RowStyle(SizeType.Percent, 100) : new RowStyle(SizeType.AutoSize));
+            Controls.Add(t);
+            if (string.IsNullOrWhiteSpace(zh.Text)) Find(); else Check();
+        }
+
+        static Label Lbl(string text)
+        {
+            var l = Theme.Label(text, 9.75f, FontStyle.Bold);
+            l.Margin = new Padding(0, 6, 8, 0);
+            return l;
+        }
+
+        static FlowLayoutPanel Row(params Control[] cs)
+        {
+            var f = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, BackColor = Theme.Panel, Margin = new Padding(8, 0, 0, 0) };
+            foreach (var c in cs) f.Controls.Add(c);
+            return f;
+        }
+
+        void Browse(TextBox box, string what)
+        {
+            using (var d = new FolderBrowserDialog { Description = what, ShowNewFolderButton = false })
+            {
+                if (Directory.Exists(box.Text)) d.SelectedPath = box.Text;
+                if (d.ShowDialog(this) == DialogResult.OK) box.Text = d.SelectedPath;
+            }
+        }
+
+        void Find()
+        {
+            var found = Engine.FindZeroHour();
+            if (found != null) zh.Text = found;
+            if (string.IsNullOrWhiteSpace(gen.Text) || !Engine.HoldsGenerals(gen.Text))
+            {
+                var g = Engine.FindGenerals(zh.Text);
+                if (g != null) gen.Text = g;
+            }
+            Check();
+            if (found == null) zhState.Text = "Not found by itself. Press Browse and pick the folder with INIZH.big in it.";
+        }
+
+        void Check()
+        {
+            var z = zh.Text.Trim();
+            if (!Engine.HoldsZeroHour(z)) { State(zhState, "No INIZH.big in this folder.", Theme.Warn); }
+            else if (Engine.HasReforgedInside(z))
+                State(zhState, "Reforged from the official launcher is installed in this folder. Press Uninstall there (or Verify files in Steam) " +
+                               "before copying, then you can install it again.", Theme.Warn);
+            else State(zhState, "Zero Hour found, original files.", Theme.Good);
+
+            var g = gen.Text.Trim();
+            if (string.IsNullOrEmpty(g) && Engine.HoldsZeroHour(z)) { var f = Engine.FindGenerals(z); if (f != null) { gen.Text = f; return; } }
+            if (Engine.HoldsGenerals(g) || File.Exists(Path.Combine(g, "Textures.big"))) State(genState, "Generals found.", Theme.Good);
+            else State(genState, "Zero Hour needs the original Generals too (a folder with Textures.big).", Theme.Warn);
+
+            if (engine.BaseReady)
+                State(baseState, "Zero Hour is copied" + (engine.State.BaseFrom != null ? " from " + engine.State.BaseFrom : "") +
+                                 ". Copy again only if you changed the game." + (engine.GameReady ? " Reforged " + engine.Pack.Version + " is installed." : ""), Theme.Good);
+            else State(baseState, "Nothing copied yet. Everything goes into " + engine.DataRoot, Theme.Muted);
+        }
+
+        static void State(Label l, string text, Color c)
+        {
+            l.Text = text; l.ForeColor = c; l.MaximumSize = new Size(440, 0);
+        }
+
+        bool Save(bool forCopy)
+        {
+            var z = zh.Text.Trim(); var g = gen.Text.Trim();
+            if (forCopy)
+            {
+                if (!Engine.HoldsZeroHour(z)) { MessageBox.Show(this, "Pick the Zero Hour folder first: the one with INIZH.big in it.", "Settings"); return false; }
+                if (!File.Exists(Path.Combine(g, "Textures.big"))) { MessageBox.Show(this, "Pick the original Generals folder too: the one with Textures.big in it.", "Settings"); return false; }
+                if (Engine.HasReforgedInside(z) &&
+                    MessageBox.Show(this, "This Zero Hour folder has Reforged from the official launcher in it. Its newer files would end up under your v3.6.0 " +
+                                          "and could differ from your friends' copies.\n\nUninstall it in the official launcher first (recommended).\n\nCopy anyway?",
+                                    "Settings", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                    return false;
+            }
+            engine.Settings.ZeroHourPath = z;
+            engine.Settings.GeneralsPath = g;
+            engine.Settings.ExtraArgs = extra.Text.Trim();
+            try { engine.SaveSettings(); } catch (Exception ex) { MessageBox.Show(this, ex.Message); return false; }
+            return true;
+        }
+    }
+}

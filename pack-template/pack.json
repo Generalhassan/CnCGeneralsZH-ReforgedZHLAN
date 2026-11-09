@@ -1,0 +1,7 @@
+{
+  "name": "LAN pack",
+  "version": "v3.6.0",
+  "build": "build/Reforged-v3.6.0.zip",
+  "patches": [],
+  "presets": []
+}
