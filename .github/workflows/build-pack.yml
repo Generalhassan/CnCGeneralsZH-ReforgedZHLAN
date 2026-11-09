@@ -82,6 +82,7 @@ jobs:
 
           Copy-Item ZHLauncher.exe pack\
           Copy-Item self\pack-template\mods pack\mods -Recurse
+          if (Test-Path self\pack-template\addons) { Copy-Item self\pack-template\addons pack\addons -Recurse }
           $p = Get-Content self\pack-template\pack.json -Raw | ConvertFrom-Json
           $p.name = $env:PACK_NAME.Trim()
           $p.version = $env:TAG

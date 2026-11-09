@@ -65,6 +65,8 @@ namespace ZHLauncher
         [DataMember(Name = "extraArgs")] public string ExtraArgs;
         // "classic" (the game's default) or "reforged": Reforged's mouse controls, -mouse
         [DataMember(Name = "mouse")] public string Mouse;
+        // true: leave the pack's add-ons (addons\*.big, e.g. HD textures) off this PC
+        [DataMember(Name = "noAddons")] public bool NoAddons;
         [DataMember(Name = "lastPreset")] public string LastPreset;
         [DataMember(Name = "customMods")] public List<string> CustomMods = new List<string>();
     }
@@ -85,9 +87,15 @@ namespace ZHLauncher
         [DataMember(Name = "buildVersion")] public string BuildVersion;
         // file path -> hash, so a mod is hashed once and not on every start
         [DataMember(Name = "hashes")] public Dictionary<string, HashEntry> Hashes = new Dictionary<string, HashEntry>();
+        // add-on files the launcher put into the game folder, so it can take them out again
+        [DataMember(Name = "addonsInGame")] public List<string> AddonsInGame = new List<string>();
 
         [OnDeserialized]
-        void Fix(StreamingContext c) { if (Hashes == null) Hashes = new Dictionary<string, HashEntry>(StringComparer.OrdinalIgnoreCase); }
+        void Fix(StreamingContext c)
+        {
+            if (Hashes == null) Hashes = new Dictionary<string, HashEntry>(StringComparer.OrdinalIgnoreCase);
+            if (AddonsInGame == null) AddonsInGame = new List<string>();
+        }
     }
 
     public static class Json

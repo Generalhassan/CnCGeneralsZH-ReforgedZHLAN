@@ -35,6 +35,8 @@ namespace ZHLauncher
         public string BaseDir { get { return Path.Combine(DataRoot, "base"); } }
         public string GameDir { get { return Path.Combine(DataRoot, "game-" + SafeName(Pack.Version)); } }
         public string LocalModsDir { get { return Path.Combine(DataRoot, "mods"); } }
+        public string LocalAddonsDir { get { return Path.Combine(DataRoot, "addons"); } }
+        public string PackAddonsDir { get { return Path.Combine(PackDir, "addons"); } }
         public string PackFile { get { return Path.Combine(PackDir, "pack.json"); } }
         string SettingsFile { get { return Path.Combine(DataRoot, "settings.json"); } }
         string StateFile { get { return Path.Combine(DataRoot, "state.json"); } }
@@ -428,6 +430,60 @@ namespace ZHLauncher
             SaveState();
         }
 
+        // ------------------------------------------------------------------ add-ons
+
+        // Archives in the pack's addons folder go next to generals.exe, the place the game mounts
+        // every .big from. ReforgedTextures.big (Reforged's HD textures) is the one this is for: the
+        // game puts its Reforged*.big over the mods' files only where a mod has no copy of its own,
+        // and Classic Graphics in the game's options leaves them out. They do not touch a match, so a
+        // PC without them still plays with everyone and they are not part of the LAN code.
+        public List<string> PackAddons()
+        {
+            if (!Directory.Exists(PackAddonsDir)) return new List<string>();
+            // Reforged*.big only: the names the game treats as Reforged's art, so nothing in here can
+            // shadow one of Zero Hour's own archives
+            return Directory.GetFiles(PackAddonsDir, "Reforged*.big").Select(f => Path.GetFileName(f))
+                            .Where(n => n.StartsWith("Reforged", StringComparison.OrdinalIgnoreCase) && !File.Exists(Path.Combine(BaseDir, n)))
+                            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        public void SyncAddons()
+        {
+            var wanted = Settings.NoAddons ? new List<string>() : PackAddons();
+
+            // this PC's copy of the add-ons, so a new build does not copy them off the stick again
+            Directory.CreateDirectory(LocalAddonsDir);
+            var copies = wanted.Select(n => Tuple.Create(Path.Combine(PackAddonsDir, n), Path.Combine(LocalAddonsDir, n)))
+                               .Where(c => Changed(c.Item1, c.Item2))
+                               .Select(c => Tuple.Create(c.Item1, c.Item2, new FileInfo(c.Item1).Length)).ToList();
+            long total = Math.Max(1, copies.Sum(c => c.Item3)), done = 0;
+            foreach (var c in copies)
+            {
+                CopyFile(c.Item1, c.Item2, b => Report(new Progress("Copying add-ons  " + Gb(done + b) + " of " + Gb(total), (double)(done + b) / total)));
+                done += c.Item3;
+            }
+            if (copies.Count > 0) Log("copied add-ons: " + string.Join(", ", copies.Select(c => Path.GetFileName(c.Item2))));
+            foreach (var f in Directory.GetFiles(LocalAddonsDir))
+                if (!wanted.Contains(Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)) { File.SetAttributes(f, FileAttributes.Normal); File.Delete(f); }
+
+            // the game folder: linked to that copy, and whatever is no longer wanted taken out
+            foreach (var old in State.AddonsInGame.Where(o => !wanted.Contains(o, StringComparer.OrdinalIgnoreCase)))
+            {
+                var target = Path.Combine(GameDir, old);
+                if (File.Exists(target) && !File.Exists(Path.Combine(BaseDir, old))) { File.SetAttributes(target, FileAttributes.Normal); File.Delete(target); }
+            }
+            foreach (var n in wanted)
+            {
+                var local = Path.Combine(LocalAddonsDir, n);
+                var target = Path.Combine(GameDir, n);
+                if (!Changed(local, target)) continue;
+                if (File.Exists(target)) { File.SetAttributes(target, FileAttributes.Normal); File.Delete(target); }
+                LinkOrCopy(local, target);
+            }
+            State.AddonsInGame = wanted;
+            SaveState();
+        }
+
         // ------------------------------------------------------------------ mods
 
         public string LocalModPath(ModInfo m) { return Path.Combine(LocalModsDir, m.Name); }
@@ -567,6 +623,7 @@ namespace ZHLauncher
         {
             if (!BaseReady) throw new Exception("Zero Hour is not set up on this PC yet. Open Settings and press Copy Zero Hour.");
             InstallBuild();
+            SyncAddons();
             SyncMods(mods);
             Report(new Progress("Checking files...", -1));
             return LanCode(mods);

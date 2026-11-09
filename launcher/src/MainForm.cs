@@ -191,7 +191,9 @@ namespace ZHLauncher
         void Refill()
         {
             var keep = presets.SelectedItem != null ? presets.SelectedItem.Name : engine.Settings.LastPreset;
-            subtitle.Text = "Reforged " + engine.Pack.Version + "   ·   " + engine.Pack.Name + "   ·   " + engine.Mods.Count + " mods in the pack";
+            var addonCount = engine.PackAddons().Count;
+            subtitle.Text = "Reforged " + engine.Pack.Version + "   ·   " + engine.Pack.Name + "   ·   " + engine.Mods.Count + " mods in the pack" +
+                            (addonCount == 0 ? "" : "   ·   " + (engine.Settings.NoAddons ? "add-ons off" : addonCount == 1 ? "1 add-on" : addonCount + " add-ons"));
             presets.Items.Clear();
             presets.Items.AddRange(engine.Pack.Presets);
             if (!engine.Pack.Presets.Any(p => p.Mods.Count == 0))
@@ -421,7 +423,7 @@ namespace ZHLauncher
             {
                 if (f.ShowDialog(this) == DialogResult.OK && f.CopyRequested)
                     RunSetup(engine.Settings.ZeroHourPath, engine.Settings.GeneralsPath);
-                else UpdateStatus();
+                else Refill();
             }
         }
 

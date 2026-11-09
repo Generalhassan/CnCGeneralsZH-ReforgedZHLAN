@@ -11,6 +11,7 @@ namespace ZHLauncher
         readonly Engine engine;
         TextBox zh, gen, extra;
         ComboBox mouse;
+        CheckBox addons;
         Label zhState, genState, baseState;
         Button copy;
         public bool CopyRequested;
@@ -27,7 +28,7 @@ namespace ZHLauncher
             StartPosition = FormStartPosition.CenterParent;
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(720, 510);
+            ClientSize = new Size(720, 570);
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(20, 16, 20, 16), BackColor = Theme.Panel };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
@@ -73,6 +74,19 @@ namespace ZHLauncher
             mouse.Items.AddRange(new object[] { "Classic (the game's default)", "Reforged" });
             mouse.SelectedIndex = string.Equals(engine.Settings.Mouse, "reforged", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             add(mouse, 1, 2); row++;
+
+            add(Lbl("Add-ons"), 0, 1);
+            var packAddons = engine.PackAddons();
+            addons = new CheckBox
+            {
+                Text = packAddons.Count == 0 ? "Use the pack's add-ons (the pack has none)" : "Use the pack's add-ons: " + string.Join(", ", packAddons),
+                Checked = !engine.Settings.NoAddons, AutoSize = true, ForeColor = Theme.Text, BackColor = Theme.Panel,
+                Font = Theme.Ui(9.75f), Margin = new Padding(3, 4, 3, 2),
+            };
+            add(addons, 1, 2); row++;
+            var addonsHint = Theme.Label("HD textures and the like. Off saves disk and video memory; it does not change who you can play with.", 9f, FontStyle.Regular, Theme.Muted);
+            addonsHint.Margin = new Padding(3, 0, 3, 12);
+            add(addonsHint, 1, 2); row++;
 
             add(Lbl("On this PC"), 0, 1);
             baseState = Theme.Label("", 9f);
@@ -185,6 +199,7 @@ namespace ZHLauncher
             engine.Settings.GeneralsPath = g;
             engine.Settings.ExtraArgs = extra.Text.Trim();
             engine.Settings.Mouse = mouse.SelectedIndex == 1 ? "reforged" : "classic";
+            engine.Settings.NoAddons = !addons.Checked;
             try { engine.SaveSettings(); } catch (Exception ex) { MessageBox.Show(this, ex.Message); return false; }
             return true;
         }
