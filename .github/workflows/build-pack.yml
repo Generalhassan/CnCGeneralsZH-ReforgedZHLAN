@@ -2,32 +2,45 @@
 # both into one download: the "ZH-LAN-Pack" artifact on the run's page (Actions > the run > Artifacts).
 # Start it from the Actions tab with "Run workflow". About 15-25 minutes.
 name: Build LAN pack
+run-name: LAN pack ${{ inputs.version }} - ${{ inputs.pack_name }}
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Reforged tag to build (3.6.0 is the last one that loads mods)
+      version:
+        description: Reforged version (3.6.0 is the last one that loads mods)
+        type: choice
+        options:
+          - v3.6.0
         default: v3.6.0
-        required: true
+      pack_name:
+        description: Name of your LAN pack, shown in the launcher
+        type: string
+        default: LAN pack
 
 jobs:
   pack:
     # Pinned: build.bat at v3.6.0 looks for Visual Studio 2022, which this image carries.
     runs-on: windows-2022
     env:
-      TAG: ${{ inputs.tag }}
+      TAG: ${{ inputs.version }}
+      PACK_NAME: ${{ inputs.pack_name }}
     steps:
+      - name: Check the version
+        shell: pwsh
+        run: |
+          if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw "Version must look like v3.6.0, got '$env:TAG'" }
+
       - name: Check out this repository (launcher and pack template)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: self
 
-      - name: Check out Reforged ${{ inputs.tag }}
-        uses: actions/checkout@v4
+      - name: Check out Reforged ${{ inputs.version }}
+        uses: actions/checkout@v6
         with:
           repository: olcayseygan/CnCGeneralsZH-Reforged
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.version }}
           path: reforged
           fetch-depth: 1
 
@@ -68,16 +81,20 @@ jobs:
               [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
           Copy-Item ZHLauncher.exe pack\
-          Copy-Item self\pack-template\pack.json pack\
           Copy-Item self\pack-template\mods pack\mods -Recurse
-          (Get-Content pack\pack.json -Raw).Replace('v3.6.0', $env:TAG) | Set-Content pack\pack.json -NoNewline
+          $p = Get-Content self\pack-template\pack.json -Raw | ConvertFrom-Json
+          $p.name = $env:PACK_NAME.Trim()
+          $p.version = $env:TAG
+          $p.build = "build/Reforged-$env:TAG.zip"
+          $p | ConvertTo-Json -Depth 6 | Set-Content pack\pack.json -Encoding utf8NoBOM
+          Get-Content pack\pack.json
 
           Get-ChildItem pack -Recurse -File | ForEach-Object { '{0,12:N0}  {1}' -f $_.Length, $_.FullName.Substring($PWD.Path.Length + 1) }
 
       - name: Upload ZH-LAN-Pack
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: ZH-LAN-Pack-${{ inputs.tag }}
+          name: ZH-LAN-Pack-${{ inputs.version }}
           path: pack
           if-no-files-found: error
           retention-days: 30
