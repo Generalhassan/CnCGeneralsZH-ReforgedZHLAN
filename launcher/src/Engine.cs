@@ -548,7 +548,10 @@ namespace ZHLauncher
 
         public string BuildArguments(List<ModInfo> mods)
         {
-            var args = new List<string>();
+            // -rk7 is the official launcher's "started by a launcher" marker: without it (or
+            // -multiInstance) generals.exe only shows "Please start Zero Hour Reforged from its launcher".
+            var args = new List<string> { "-rk7" };
+            if (string.Equals(Settings.Mouse, "reforged", StringComparison.OrdinalIgnoreCase)) { args.Add("-mouse"); args.Add("reforged"); }
             foreach (var m in mods)
             {
                 args.Add(m.IsPatch ? "-modpatch" : "-mod");

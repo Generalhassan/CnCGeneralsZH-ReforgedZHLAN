@@ -10,6 +10,7 @@ namespace ZHLauncher
     {
         readonly Engine engine;
         TextBox zh, gen, extra;
+        ComboBox mouse;
         Label zhState, genState, baseState;
         Button copy;
         public bool CopyRequested;
@@ -26,7 +27,7 @@ namespace ZHLauncher
             StartPosition = FormStartPosition.CenterParent;
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(720, 470);
+            ClientSize = new Size(720, 510);
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(20, 16, 20, 16), BackColor = Theme.Panel };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
@@ -66,6 +67,12 @@ namespace ZHLauncher
             add(extra, 1, 2); row++;
             var extraHint = Theme.Label("Just for this PC, e.g. -win for a window. The pack can add its own for everyone.", 9f, FontStyle.Regular, Theme.Muted);
             add(extraHint, 1, 2); row++;
+
+            add(Lbl("Mouse"), 0, 1);
+            mouse = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.Panel2, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat, Width = 260, Margin = new Padding(3, 3, 3, 12) };
+            mouse.Items.AddRange(new object[] { "Classic (the game's default)", "Reforged" });
+            mouse.SelectedIndex = string.Equals(engine.Settings.Mouse, "reforged", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            add(mouse, 1, 2); row++;
 
             add(Lbl("On this PC"), 0, 1);
             baseState = Theme.Label("", 9f);
@@ -177,6 +184,7 @@ namespace ZHLauncher
             engine.Settings.ZeroHourPath = z;
             engine.Settings.GeneralsPath = g;
             engine.Settings.ExtraArgs = extra.Text.Trim();
+            engine.Settings.Mouse = mouse.SelectedIndex == 1 ? "reforged" : "classic";
             try { engine.SaveSettings(); } catch (Exception ex) { MessageBox.Show(this, ex.Message); return false; }
             return true;
         }

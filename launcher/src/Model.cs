@@ -63,6 +63,8 @@ namespace ZHLauncher
         [DataMember(Name = "zeroHourPath")] public string ZeroHourPath;
         [DataMember(Name = "generalsPath")] public string GeneralsPath;
         [DataMember(Name = "extraArgs")] public string ExtraArgs;
+        // "classic" (the game's default) or "reforged": Reforged's mouse controls, -mouse
+        [DataMember(Name = "mouse")] public string Mouse;
         [DataMember(Name = "lastPreset")] public string LastPreset;
         [DataMember(Name = "customMods")] public List<string> CustomMods = new List<string>();
     }
