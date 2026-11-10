@@ -1,5 +1,4 @@
-# Builds Zero Hour Reforged v3.6.0 from the original repository, builds the LAN launcher, and puts
-# both into one download: the "ZH-LAN-Pack" artifact on the run's page (Actions > the run > Artifacts).
+# Builds Zero Hour Reforged v3.6.0, builds the LAN launcher, and puts both into one download: the "ZH-LAN-Pack" artifact on the run's page (Actions > the run > Artifacts).
 # Start it from the Actions tab with "Run workflow". About 15-25 minutes.
 name: Build LAN pack
 run-name: LAN pack ${{ inputs.version }} - ${{ inputs.pack_name }}
@@ -8,11 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Reforged version (3.6.0 is the last one that loads mods)
+        description: "Game build: lan-3.6.0 = v3.6.0 with EA's general pictures (branch of this fork), v3.6.0 = the original"
         type: choice
         options:
+          - lan-3.6.0
           - v3.6.0
-        default: v3.6.0
+        default: lan-3.6.0
       pack_name:
         description: Name of your LAN pack, shown in the launcher
         type: string
@@ -23,24 +23,32 @@ jobs:
     # Pinned: build.bat at v3.6.0 looks for Visual Studio 2022, which this image carries.
     runs-on: windows-2022
     env:
-      TAG: ${{ inputs.version }}
       PACK_NAME: ${{ inputs.pack_name }}
     steps:
-      - name: Check the version
+      - name: Pick the game source
+        id: source
         shell: pwsh
         run: |
-          if ($env:TAG -notmatch '^v\d+\.\d+\.\d+$') { throw "Version must look like v3.6.0, got '$env:TAG'" }
+          switch ('${{ inputs.version }}') {
+            'lan-3.6.0' { $repo = '${{ github.repository }}'; $ref = 'refs/heads/lan-3.6.0'; $tag = 'v3.6.0-lan' }
+            'v3.6.0'    { $repo = 'olcayseygan/CnCGeneralsZH-Reforged'; $ref = 'refs/tags/v3.6.0'; $tag = 'v3.6.0' }
+            default     { throw "Unknown game build '${{ inputs.version }}'" }
+          }
+          "repo=$repo" >> $env:GITHUB_OUTPUT
+          "ref=$ref"   >> $env:GITHUB_OUTPUT
+          "TAG=$tag"   >> $env:GITHUB_ENV
+          "Building $ref from $repo as $tag"
 
       - name: Check out this repository (launcher and pack template)
         uses: actions/checkout@v6
         with:
           path: self
 
-      - name: Check out Reforged ${{ inputs.version }}
+      - name: Check out the game (${{ inputs.version }})
         uses: actions/checkout@v6
         with:
-          repository: olcayseygan/CnCGeneralsZH-Reforged
-          ref: refs/tags/${{ inputs.version }}
+          repository: ${{ steps.source.outputs.repo }}
+          ref: ${{ steps.source.outputs.ref }}
           path: reforged
           fetch-depth: 1
 
@@ -95,7 +103,7 @@ jobs:
       - name: Upload ZH-LAN-Pack
         uses: actions/upload-artifact@v6
         with:
-          name: ZH-LAN-Pack-${{ inputs.version }}
+          name: ZH-LAN-Pack-${{ env.TAG }}
           path: pack
           if-no-files-found: error
           retention-days: 30

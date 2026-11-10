@@ -551,6 +551,9 @@ namespace ZHLauncher
 
             Log("installing build " + zip + " " + sha);
             if (Directory.Exists(GameDir)) { Report(new Progress("Removing the old game folder...", -1)); ForceDelete(GameDir); }
+            // a game folder of another version (the pack moved from v3.6.0 to v3.6.0-lan, say) is not used again
+            foreach (var old in Directory.GetDirectories(DataRoot, "game-*"))
+                if (!SamePath(old, GameDir)) { Report(new Progress("Removing " + Path.GetFileName(old) + "...", -1)); ForceDelete(old); }
 
             var src = Path.GetFullPath(BaseDir).TrimEnd('\\', '/');
             var files = Directory.GetFiles(src, "*", SearchOption.AllDirectories);
