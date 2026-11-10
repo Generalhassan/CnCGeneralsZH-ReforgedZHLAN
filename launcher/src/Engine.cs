@@ -670,7 +670,8 @@ namespace ZHLauncher
                 {
                     var b = new byte[4];
                     int n = fs.Read(b, 0, 4);
-                    return n == 4 ? b : new byte[0];
+                    if (n < 4) Array.Resize(ref b, Math.Max(0, n));
+                    return b;
                 }
             }
             catch { return new byte[0]; }
