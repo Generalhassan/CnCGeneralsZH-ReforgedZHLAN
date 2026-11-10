@@ -77,6 +77,161 @@ namespace ZHLauncher
             return s;
         }
 
+        // ------------------------------------------------------------------ where the launcher keeps its files
+
+        public static string DefaultDataRoot
+        {
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZHLauncher"); }
+        }
+
+        // The folder picked under Settings, Game files. It is written to a one-line file in the
+        // default folder, because settings.json itself lives in the picked one.
+        static string PointerFile { get { return Path.Combine(DefaultDataRoot, "datafolder.txt"); } }
+
+        public static string ChosenDataRoot()
+        {
+            try
+            {
+                if (File.Exists(PointerFile))
+                {
+                    var p = File.ReadAllText(PointerFile).Trim();
+                    if (p.Length > 0 && Directory.Exists(p)) return p;
+                }
+            }
+            catch { }
+            return DefaultDataRoot;
+        }
+
+        static string Norm(string dir) { return Path.GetFullPath(dir).TrimEnd('\\', '/'); }
+        static bool SamePath(string a, string b) { return string.Equals(Norm(a), Norm(b), StringComparison.OrdinalIgnoreCase); }
+        static bool Inside(string dir, string root) { return Norm(dir).StartsWith(Norm(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase); }
+
+        static void SetChosenDataRoot(string dir)
+        {
+            Directory.CreateDirectory(DefaultDataRoot);
+            if (SamePath(dir, DefaultDataRoot)) { if (File.Exists(PointerFile)) File.Delete(PointerFile); }
+            else File.WriteAllText(PointerFile, Norm(dir));
+        }
+
+        static readonly string[] OwnFiles = { "settings.json", "state.json", "launcher.log" };
+        static bool IsOwnDir(string name)
+        {
+            return name.Equals("base", StringComparison.OrdinalIgnoreCase) || name.Equals("mods", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("addons", StringComparison.OrdinalIgnoreCase) || name.StartsWith("game-", StringComparison.OrdinalIgnoreCase);
+        }
+        public static bool IsLauncherFolder(string dir)
+        {
+            return File.Exists(Path.Combine(dir, "settings.json")) || Directory.Exists(Path.Combine(dir, "base"));
+        }
+
+        // for the tests: behave as if the new folder were on another drive
+        public static bool TestOtherDrive;
+
+        static bool SameVolume(string a, string b)
+        {
+            if (TestOtherDrive) return false;
+            return string.Equals(Path.GetPathRoot(Norm(a)), Path.GetPathRoot(Norm(b)), StringComparison.OrdinalIgnoreCase);
+        }
+
+        static long SizeOf(string dir)
+        {
+            if (!Directory.Exists(dir)) return 0;
+            try { return Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length); } catch { return 0; }
+        }
+
+        public enum MoveKind { Same, Move, UseExisting, Refused }
+
+        public MoveKind CheckMoveTarget(string target, out string message)
+        {
+            if (SamePath(target, DataRoot)) { message = "That is already the launcher's folder."; return MoveKind.Same; }
+            if (Inside(target, DataRoot)) { message = "Pick a folder outside the current one."; return MoveKind.Refused; }
+            if (SamePath(target, PackDir) || Inside(target, PackDir))
+            { message = "Pick a folder outside the LAN pack: the pack is what you copy to the other PCs."; return MoveKind.Refused; }
+            if (Directory.Exists(target) && IsLauncherFolder(target))
+            {
+                message = "This folder already holds the launcher's files (from an earlier move or another copy). " +
+                          "Switch to them? What is in " + DataRoot + " stays where it is.";
+                return MoveKind.UseExisting;
+            }
+            if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any())
+            { message = "That folder has other files in it. Pick an empty folder, or make a new one with Make New Folder."; return MoveKind.Refused; }
+
+            long bytes = SizeOf(BaseDir) + SizeOf(LocalModsDir) + SizeOf(LocalAddonsDir);
+            string fs = null;
+            try { fs = new DriveInfo(Path.GetPathRoot(Norm(target))).DriveFormat; } catch { }
+            if (bytes == 0) message = "Nothing is copied on this PC yet, so the launcher simply uses the new folder from now on.";
+            else if (SameVolume(DataRoot, target)) message = "Everything moves there (" + Gb(bytes) + ", the same drive, so it only takes a moment).";
+            else message = Gb(bytes) + " are copied there and then removed here. The game folder is set up again from them on the next Play.";
+            if (fs != null && !fs.Equals("NTFS", StringComparison.OrdinalIgnoreCase))
+                message += "\n\nThat drive is " + fs + ", which has no file links: the game folder will take another copy of Zero Hour's size there.";
+            return MoveKind.Move;
+        }
+
+        // Moves base, mods, add-ons, the game folder and the launcher's own files to target and makes it
+        // the launcher's folder. The launcher has to start again afterwards.
+        public void MoveData(string target)
+        {
+            if (Process.GetProcessesByName("generals").Length > 0) throw new Exception("Close Zero Hour first: its files are in use.");
+            target = Norm(target);
+            var here = Norm(DataRoot);
+            SaveSettings();
+            SaveState();
+            Directory.CreateDirectory(target);
+            var dirs = Directory.GetDirectories(here).Where(d => IsOwnDir(Path.GetFileName(d))).ToList();
+            bool rebuildGame = false;
+
+            if (SameVolume(here, target))
+            {
+                foreach (var d in dirs)
+                {
+                    Report(new Progress("Moving " + Path.GetFileName(d) + "...", -1));
+                    Directory.Move(d, Path.Combine(target, Path.GetFileName(d)));   // a rename: links stay links
+                }
+                foreach (var f in OwnFiles) { var p = Path.Combine(here, f); if (File.Exists(p)) File.Move(p, Path.Combine(target, f)); }
+            }
+            else
+            {
+                // the game folder is mostly links into base: copied, it would take Zero Hour's size twice
+                var jobs = dirs.Where(d => !Path.GetFileName(d).StartsWith("game-", StringComparison.OrdinalIgnoreCase))
+                               .Select(d => new KeyValuePair<string, string>(d, Path.Combine(target, Path.GetFileName(d)))).ToList();
+                try
+                {
+                    CopyTrees(jobs, "Moving the launcher's files");
+                    foreach (var f in OwnFiles) { var p = Path.Combine(here, f); if (File.Exists(p)) File.Copy(p, Path.Combine(target, f), true); }
+                }
+                catch
+                {
+                    foreach (var j in jobs) if (Directory.Exists(j.Value)) ForceDelete(j.Value);
+                    foreach (var f in OwnFiles) { var p = Path.Combine(target, f); if (File.Exists(p)) File.Delete(p); }
+                    throw;
+                }
+                foreach (var d in dirs) { Report(new Progress("Removing the old copy...", -1)); ForceDelete(d); }
+                foreach (var f in OwnFiles) { var p = Path.Combine(here, f); if (File.Exists(p)) File.Delete(p); }
+                rebuildGame = true;
+            }
+
+            // remembered hashes are filed under full paths
+            var hashes = new Dictionary<string, HashEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in State.Hashes)
+            {
+                var k = kv.Key;
+                if (k.StartsWith(here + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) k = target + k.Substring(here.Length);
+                hashes[k] = kv.Value;
+            }
+            State.Hashes = hashes;
+            if (rebuildGame) { State.BuildSha256 = null; State.AddonsInGame = new List<string>(); }
+            Json.Save(Path.Combine(target, "state.json"), State);
+            SetChosenDataRoot(target);
+            try { File.AppendAllText(Path.Combine(target, "launcher.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  moved here from " + here + Environment.NewLine); } catch { }
+        }
+
+        public void UseExistingData(string target)
+        {
+            SaveSettings();
+            SaveState();
+            SetChosenDataRoot(target);
+        }
+
         // ------------------------------------------------------------------ the pack
 
         public void ReloadPack()
@@ -334,7 +489,10 @@ namespace ZHLauncher
             }
         }
 
-        static string Gb(long b) { return (b / 1073741824.0).ToString("0.00") + " GB"; }
+        static string Gb(long b)
+        {
+            return b >= 1073741824L ? (b / 1073741824.0).ToString("0.00") + " GB" : Math.Max(1, (long)Math.Round(b / 1048576.0)) + " MB";
+        }
 
         static void CopyFile(string src, string dst, Action<long> onBytes)
         {

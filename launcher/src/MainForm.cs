@@ -407,6 +407,27 @@ namespace ZHLauncher
             finally { SetBusy(false); UpdateStatus(); }
         }
 
+        async void RunMove(string target, bool useExisting)
+        {
+            SetBusy(true);
+            try
+            {
+                if (useExisting) engine.UseExistingData(target);
+                else await Task.Run(() => engine.MoveData(target));
+                MessageBox.Show(this, "The launcher now keeps its files in\n" + target + "\n\nIt starts again from there.", "Game files",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Application.Restart();
+            }
+            catch (Exception ex)
+            {
+                engine.Log("move error: " + ex);
+                SetStatus(ex.Message, Theme.Warn);
+                MessageBox.Show(this, "Nothing was moved:\n" + ex.Message, "Game files", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetBusy(false);
+                UpdateStatus();
+            }
+        }
+
         void FirstStart()
         {
             if (!engine.BaseReady) OpenSettings();
@@ -416,8 +437,9 @@ namespace ZHLauncher
         {
             using (var f = new SettingsForm(engine))
             {
-                if (f.ShowDialog(this) == DialogResult.OK && f.CopyRequested)
-                    RunSetup(engine.Settings.ZeroHourPath, engine.Settings.GeneralsPath);
+                var result = f.ShowDialog(this);
+                if (result == DialogResult.OK && f.MoveTarget != null) RunMove(f.MoveTarget, f.MoveUseExisting);
+                else if (result == DialogResult.OK && f.CopyRequested) RunSetup(engine.Settings.ZeroHourPath, engine.Settings.GeneralsPath);
                 else Refill();
             }
         }

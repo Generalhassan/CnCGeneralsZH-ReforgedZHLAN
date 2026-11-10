@@ -101,9 +101,15 @@ LAN code.
 4. Before hosting, compare the **LAN code** across the room (**Check files** shows it without
    starting the game).
 
-Where the launcher keeps its files on each PC: `%LocalAppData%\ZHLauncher` (base copy, game folder,
-mods, settings, `launcher.log`). The game folder uses hard links to the base copy, so it costs
-almost no extra space.
+Where the launcher keeps its files on each PC: `%LocalAppData%\ZHLauncher` by default. That folder
+holds the copy of Zero Hour (`base`), the game folder, mods, add-ons, settings and `launcher.log`.
+The game folder uses hard links to the base copy, so it costs almost no extra space.
+**Settings → Game files → Change…** moves all of it to another folder or drive, for example `D:\Games\ZH-LAN`:
+- Pick an empty folder (or make one). On the same drive, the move is a rename that takes a moment.
+- On another drive, the base copy, mods and add-ons are copied over and removed afterwards. The game
+  folder is set up again on the next Play.
+- A folder that already holds launcher files is simply switched to.
+- The launcher remembers the choice in `%LocalAppData%\ZHLauncher\datafolder.txt`.
 
 ## Notes
 

@@ -27,7 +27,7 @@ namespace ZHLauncher
             Application.SetCompatibleTextRenderingDefault(false);
 
             string pack = AppDomain.CurrentDomain.BaseDirectory;
-            string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZHLauncher");
+            string data = Engine.ChosenDataRoot();
             for (int i = 0; i + 1 < args.Length; i++)
             {
                 if (args[i] == "--pack") pack = args[++i];

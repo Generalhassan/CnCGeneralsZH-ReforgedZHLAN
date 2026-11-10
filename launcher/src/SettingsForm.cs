@@ -15,6 +15,9 @@ namespace ZHLauncher
         Label zhState, genState, baseState;
         Button copy;
         public bool CopyRequested;
+        public string MoveTarget;
+        public bool MoveUseExisting;
+        Label dataPath;
 
         public SettingsForm(Engine engine)
         {
@@ -94,12 +97,24 @@ namespace ZHLauncher
             addonsHint.Margin = Theme.P(3, 0, 3, 12);
             add(addonsHint, 1, 2); row++;
 
-            add(Lbl("On this PC"), 0, 1);
+            add(Lbl("Game files"), 0, 1);
+            var dataBox = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, BackColor = Theme.Panel, Margin = new Padding(0) };
+            dataPath = Theme.Label(engine.DataRoot, 9.75f);
+            dataPath.MaximumSize = Theme.Sz(440, 0);
+            dataPath.Margin = Theme.P(3, 6, 3, 2);
             baseState = Theme.Label("", 9f);
             baseState.MaximumSize = Theme.Sz(440, 0);
-            add(baseState, 1, 1);
-            var dataButtons = Row(Theme.Button("Open"));
+            baseState.Margin = Theme.P(3, 0, 3, 4);
+            var dataHint = Theme.Label("Where the launcher keeps its copy of Zero Hour, the game, the mods and the add-ons.", 9f, FontStyle.Regular, Theme.Muted);
+            dataHint.MaximumSize = Theme.Sz(440, 0);
+            dataHint.Margin = Theme.P(3, 0, 3, 8);
+            dataBox.Controls.Add(dataPath);
+            dataBox.Controls.Add(baseState);
+            dataBox.Controls.Add(dataHint);
+            add(dataBox, 1, 1);
+            var dataButtons = Row(Theme.Button("Open"), Theme.Button("Change..."));
             dataButtons.Controls[0].Click += (s, e) => { try { Process.Start(new ProcessStartInfo(engine.DataRoot) { UseShellExecute = true }); } catch { } };
+            dataButtons.Controls[1].Click += (s, e) => ChangeDataFolder();
             add(dataButtons, 2, 1); row++;
 
             var spacer = new Panel { Height = Theme.S(10), Width = Theme.S(10), BackColor = Theme.Panel, Margin = new Padding(0) };
@@ -149,6 +164,41 @@ namespace ZHLauncher
             }
         }
 
+        void ChangeDataFolder()
+        {
+            string picked;
+            using (var d = new FolderBrowserDialog
+            {
+                Description = "Where should the launcher keep Zero Hour, the game, the mods and the add-ons? Pick an empty folder or make a new one.",
+                ShowNewFolderButton = true,
+            })
+            {
+                if (Directory.Exists(engine.DataRoot)) d.SelectedPath = engine.DataRoot;
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                picked = d.SelectedPath;
+            }
+            string message;
+            var kind = engine.CheckMoveTarget(picked, out message);
+            switch (kind)
+            {
+                case Engine.MoveKind.Same:
+                case Engine.MoveKind.Refused:
+                    MessageBox.Show(this, message, "Game files", MessageBoxButtons.OK, kind == Engine.MoveKind.Same ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                    return;
+                case Engine.MoveKind.UseExisting:
+                    if (MessageBox.Show(this, message, "Game files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    break;
+                default:
+                    if (MessageBox.Show(this, "Move the launcher's files to\n" + picked + "?\n\n" + message + "\n\nThe launcher starts again when it is done.",
+                                        "Game files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                    break;
+            }
+            if (!Save(false)) return;
+            MoveTarget = picked;
+            MoveUseExisting = kind == Engine.MoveKind.UseExisting;
+            DialogResult = DialogResult.OK;
+        }
+
         void Find()
         {
             var found = Engine.FindZeroHour();
@@ -179,7 +229,7 @@ namespace ZHLauncher
             if (engine.BaseReady)
                 State(baseState, "Zero Hour is copied" + (engine.State.BaseFrom != null ? " from " + engine.State.BaseFrom : "") +
                                  ". Copy again only if you changed the game." + (engine.GameReady ? " Reforged " + engine.Pack.Version + " is installed." : ""), Theme.Good);
-            else State(baseState, "Nothing copied yet. Everything goes into " + engine.DataRoot, Theme.Muted);
+            else State(baseState, "Nothing copied yet.", Theme.Muted);
         }
 
         static void State(Label l, string text, Color c)
