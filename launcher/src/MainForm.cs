@@ -33,10 +33,9 @@ namespace ZHLauncher
             ForeColor = Theme.Text;
             Font = Theme.Ui(9.75f);
             StartPosition = FormStartPosition.CenterScreen;
-            AutoScaleDimensions = new SizeF(96F, 96F);
-            AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(980, 640);
-            MinimumSize = new Size(820, 560);
+                        AutoScaleMode = AutoScaleMode.None;
+            ClientSize = Theme.Sz(980, 640);
+            MinimumSize = Theme.Sz(820, 560);
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
 
             SuspendLayout();
@@ -52,11 +51,11 @@ namespace ZHLauncher
 
         void BuildLayout()
         {
-            var header = new Panel { Dock = DockStyle.Top, Height = 78, BackColor = Theme.Panel, Padding = new Padding(22, 12, 22, 10) };
+            var header = new Panel { Dock = DockStyle.Top, Height = Theme.S(78), BackColor = Theme.Panel, Padding = Theme.P(22, 12, 22, 10) };
             title = Theme.Label("ZERO HOUR REFORGED", 18f, FontStyle.Bold, Theme.Gold);
-            title.Location = new Point(20, 10);
+            title.Location = Theme.Pt(20, 10);
             subtitle = Theme.Label("", 10f, FontStyle.Regular, Theme.Muted);
-            subtitle.Location = new Point(23, 46);
+            subtitle.Location = Theme.Pt(23, 46);
             settingsButton = Theme.Button("Settings");
             settingsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             settingsButton.Click += (s, e) => OpenSettings();
@@ -66,7 +65,7 @@ namespace ZHLauncher
             var headerButtons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Right, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false,
-                FlowDirection = FlowDirection.LeftToRight, BackColor = Color.Transparent, Padding = new Padding(0, 10, 0, 0),
+                FlowDirection = FlowDirection.LeftToRight, BackColor = Color.Transparent, Padding = Theme.P(0, 10, 0, 0),
             };
             headerButtons.Controls.Add(packButton);
             headerButtons.Controls.Add(settingsButton);
@@ -74,22 +73,22 @@ namespace ZHLauncher
             header.Controls.Add(title);
             header.Controls.Add(subtitle);
 
-            var footer = new Panel { Dock = DockStyle.Bottom, Height = 46, BackColor = Theme.Panel, Padding = new Padding(22, 8, 22, 8) };
+            var footer = new Panel { Dock = DockStyle.Bottom, Height = Theme.S(46), BackColor = Theme.Panel, Padding = Theme.P(22, 8, 22, 8) };
             status = Theme.Label("", 9.75f, FontStyle.Regular, Theme.Muted);
             status.AutoSize = false;
             status.Dock = DockStyle.Fill;
             status.TextAlign = ContentAlignment.MiddleLeft;
-            bar = new ProgressBar { Dock = DockStyle.Right, Width = 260, Style = ProgressBarStyle.Continuous, Visible = false, Maximum = 1000 };
+            bar = new ProgressBar { Dock = DockStyle.Right, Width = Theme.S(260), Style = ProgressBarStyle.Continuous, Visible = false, Maximum = 1000 };
             footer.Controls.Add(status);
             footer.Controls.Add(bar);
 
-            var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(16, 16, 16, 16), BackColor = Theme.Back };
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 330));
+            var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = Theme.P(16, 16, 16, 16), BackColor = Theme.Back };
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(330)));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
             // left: the presets
-            var left = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = new Padding(12), Margin = new Padding(0, 0, 12, 0) };
+            var left = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = Theme.P(12, 12, 12, 12), Margin = Theme.P(0, 0, 12, 0) };
             var presetsHeader = Theme.Label("PRESETS", 9f, FontStyle.Bold, Theme.Muted);
             presetsHeader.Dock = DockStyle.Top;
             var menu = new ContextMenuStrip();
@@ -98,17 +97,17 @@ namespace ZHLauncher
             presets.SelectionChanged += (s, e) => ShowSelected();
             presets.ItemActivated += (s, e) => { if (!busy) Run(true); };
             menu.Opening += (s, e) => { var p = presets.SelectedItem as PresetDef; e.Cancel = p == null || p.Name == CustomName || !engine.Pack.Presets.Contains(p); };
-            var leftGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0), Padding = new Padding(0), BackColor = Theme.Panel };
+            var leftGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Theme.P(0, 0, 0, 0), Padding = Theme.P(0, 0, 0, 0), BackColor = Theme.Panel };
             leftGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             leftGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             presetsHeader.Dock = DockStyle.None;
-            presetsHeader.Margin = new Padding(0, 0, 0, 6);
+            presetsHeader.Margin = Theme.P(0, 0, 0, 6);
             leftGrid.Controls.Add(presetsHeader, 0, 0);
             leftGrid.Controls.Add(presets, 0, 1);
             left.Controls.Add(leftGrid);
 
             // right: what the selected preset loads, and Play
-            var right = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = new Padding(22, 18, 22, 18), ColumnCount = 1, Margin = new Padding(0) };
+            var right = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Theme.Panel, Padding = Theme.P(22, 18, 22, 18), ColumnCount = 1, Margin = Theme.P(0, 0, 0, 0) };
             right.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // name
             right.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // description
             right.RowStyles.Add(new RowStyle(SizeType.AutoSize));     // LOAD ORDER
@@ -118,15 +117,15 @@ namespace ZHLauncher
 
             presetName = Theme.Label("", 17f, FontStyle.Bold);
             presetDesc = Theme.Label("", 10f, FontStyle.Regular, Theme.Muted);
-            presetDesc.MaximumSize = new Size(560, 0);
+            presetDesc.MaximumSize = Theme.Sz(560, 0);
             orderHeader = Theme.Label("LOAD ORDER  (a later mod wins where two change the same file)", 9f, FontStyle.Bold, Theme.Muted);
-            orderHeader.Margin = new Padding(0, 14, 0, 6);
+            orderHeader.Margin = Theme.P(0, 14, 0, 6);
 
-            var listHost = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), BackColor = Theme.Panel };
+            var listHost = new Panel { Dock = DockStyle.Fill, Margin = Theme.P(0, 0, 0, 0), BackColor = Theme.Panel };
             orderView = new ListBox
             {
                 Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Theme.Panel2, ForeColor = Theme.Text,
-                DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Scale(34), SelectionMode = SelectionMode.None, IntegralHeight = false,
+                DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.S(34), SelectionMode = SelectionMode.None, IntegralHeight = false,
             };
             orderView.DrawItem += DrawOrderItem;
             customList = new CheckedListBox
@@ -135,17 +134,17 @@ namespace ZHLauncher
                 CheckOnClick = true, IntegralHeight = false, Font = Theme.Ui(10.5f), Visible = false,
             };
             customList.ItemCheck += (s, e) => { if (!filling && IsHandleCreated) BeginInvoke(new Action(CustomChanged)); };
-            customButtons = new FlowLayoutPanel { Dock = DockStyle.Right, Width = Scale(110), FlowDirection = FlowDirection.TopDown, Padding = new Padding(10, 0, 0, 0), Visible = false, BackColor = Theme.Panel };
+            customButtons = new FlowLayoutPanel { Dock = DockStyle.Right, Width = Theme.S(110), FlowDirection = FlowDirection.TopDown, Padding = Theme.P(10, 0, 0, 0), Visible = false, BackColor = Theme.Panel };
             up = Theme.Button("Move up"); up.Click += (s, e) => MoveCustom(-1);
             down = Theme.Button("Move down"); down.Click += (s, e) => MoveCustom(1);
-            up.Margin = down.Margin = new Padding(0, 0, 0, 8);
+            up.Margin = down.Margin = Theme.P(0, 0, 0, 8);
             customButtons.Controls.Add(up);
             customButtons.Controls.Add(down);
             listHost.Controls.Add(orderView);
             listHost.Controls.Add(customList);
             listHost.Controls.Add(customButtons);
 
-            var codeRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Margin = new Padding(0, 14, 0, 10), BackColor = Theme.Panel };
+            var codeRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Margin = Theme.P(0, 14, 0, 10), BackColor = Theme.Panel };
             codeLabel = Theme.Label("", 13f, FontStyle.Bold);
             codeHint = Theme.Label("Everyone in the room should see the same code before you host.", 9f, FontStyle.Regular, Theme.Muted);
             codeRow.Controls.Add(codeLabel);
@@ -153,14 +152,14 @@ namespace ZHLauncher
 
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Theme.Panel };
             play = Theme.Button("PLAY", true);
-            play.Size = new Size(Scale(200), Scale(52));
-            play.Margin = new Padding(0, 0, 12, 0);
+            play.Size = new Size(Theme.S(200), Theme.S(52));
+            play.Margin = Theme.P(0, 0, 12, 0);
             play.Click += (s, e) => Run(true);
             check = Theme.Button("Check files");
-            check.Margin = new Padding(0, 12, 8, 0);
+            check.Margin = Theme.P(0, 12, 8, 0);
             check.Click += (s, e) => Run(false);
             savePreset = Theme.Button("Save as preset");
-            savePreset.Margin = new Padding(0, 12, 8, 0);
+            savePreset.Margin = Theme.P(0, 12, 8, 0);
             savePreset.Click += (s, e) => SaveCustomAsPreset();
             buttons.Controls.Add(play);
             buttons.Controls.Add(check);
@@ -181,10 +180,6 @@ namespace ZHLauncher
             Controls.Add(header);
         }
 
-        int Scale(int px)
-        {
-            using (var g = CreateGraphics()) return (int)Math.Round(px * g.DpiX / 96f);
-        }
 
         // ------------------------------------------------------------------ filling it
 
@@ -321,15 +316,15 @@ namespace ZHLauncher
             {
                 if (p == null || p.Mods.Count == 0)
                 {
-                    TextRenderer.DrawText(g, text, f, new Rectangle(e.Bounds.X + 12, e.Bounds.Y, e.Bounds.Width - 24, e.Bounds.Height), Theme.Muted, tf);
+                    TextRenderer.DrawText(g, text, f, new Rectangle(e.Bounds.X + Theme.S(12), e.Bounds.Y, e.Bounds.Width - Theme.S(24), e.Bounds.Height), Theme.Muted, tf);
                     return;
                 }
                 var m = engine.FindMod(text);
-                TextRenderer.DrawText(g, (e.Index + 1) + ".", fb, new Rectangle(e.Bounds.X + 12, e.Bounds.Y, 30, e.Bounds.Height), Theme.Gold, tf);
+                TextRenderer.DrawText(g, (e.Index + 1) + ".", fb, new Rectangle(e.Bounds.X + Theme.S(12), e.Bounds.Y, Theme.S(30), e.Bounds.Height), Theme.Gold, tf);
                 var label = m == null ? text + "   - not in the pack's mods folder" : m.Label;
                 var kind = m == null ? "" : (m.IsPatch ? "patch  -modpatch" : "mod  -mod");
-                TextRenderer.DrawText(g, label, f, new Rectangle(e.Bounds.X + 44, e.Bounds.Y, e.Bounds.Width - 200, e.Bounds.Height), m == null ? Theme.Warn : Theme.Text, tf);
-                TextRenderer.DrawText(g, kind, Theme.Ui(9f), new Rectangle(e.Bounds.Right - 150, e.Bounds.Y, 140, e.Bounds.Height), Theme.Muted, tf | TextFormatFlags.Right);
+                TextRenderer.DrawText(g, label, f, new Rectangle(e.Bounds.X + Theme.S(44), e.Bounds.Y, e.Bounds.Width - Theme.S(200), e.Bounds.Height), m == null ? Theme.Warn : Theme.Text, tf);
+                TextRenderer.DrawText(g, kind, Theme.Ui(9f), new Rectangle(e.Bounds.Right - Theme.S(150), e.Bounds.Y, Theme.S(140), e.Bounds.Height), Theme.Muted, tf | TextFormatFlags.Right);
             }
         }
 
@@ -480,20 +475,19 @@ namespace ZHLauncher
                 f.FormBorderStyle = FormBorderStyle.FixedDialog;
                 f.StartPosition = FormStartPosition.CenterParent;
                 f.MinimizeBox = f.MaximizeBox = false;
-                f.AutoScaleDimensions = new SizeF(96F, 96F);
-                f.AutoScaleMode = AutoScaleMode.Dpi;
-                f.ClientSize = new Size(440, 140);
+                f.AutoScaleMode = AutoScaleMode.None;
+                f.ClientSize = Theme.Sz(440, 140);
                 var q = Theme.Label(question);
-                q.Location = new Point(16, 16);
+                q.Location = Theme.Pt(16, 16);
                 var box = Theme.TextBox();
                 box.Text = initial;
-                box.SetBounds(16, 44, 408, 26);
+                box.SetBounds(Theme.S(16), Theme.S(44), Theme.S(408), Theme.S(26));
                 var ok = Theme.Button("Save", false);
                 ok.DialogResult = DialogResult.OK;
-                ok.Location = new Point(270, 92);
+                ok.Location = Theme.Pt(270, 92);
                 var cancel = Theme.Button("Cancel");
                 cancel.DialogResult = DialogResult.Cancel;
-                cancel.Location = new Point(350, 92);
+                cancel.Location = Theme.Pt(350, 92);
                 f.Controls.AddRange(new Control[] { q, box, ok, cancel });
                 f.AcceptButton = ok;
                 f.CancelButton = cancel;

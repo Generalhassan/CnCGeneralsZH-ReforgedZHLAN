@@ -26,12 +26,18 @@ namespace ZHLauncher
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            AutoScaleDimensions = new SizeF(96F, 96F);
-            AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(720, 570);
+            AutoScaleMode = AutoScaleMode.None;
+            // the dialog takes the size of what is in it, so nothing overlaps at 125 % or 150 % scaling
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(20, 16, 20, 16), BackColor = Theme.Panel };
-            t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+            var t = new TableLayoutPanel
+            {
+                ColumnCount = 3, Padding = Theme.P(20, 16, 20, 16), BackColor = Theme.Panel,
+                AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Location = new Point(0, 0),
+                MinimumSize = Theme.Sz(760, 0),
+            };
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(150)));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
@@ -40,12 +46,12 @@ namespace ZHLauncher
 
             var intro = Theme.Label("The launcher plays from its own copy of Zero Hour, so your Steam or EA install and the official Reforged launcher are left alone. " +
                                     "The copy has to be made once on every PC.", 9.75f, FontStyle.Regular, Theme.Muted);
-            intro.MaximumSize = new Size(670, 0);
-            intro.Margin = new Padding(0, 0, 0, 14);
+            intro.MaximumSize = Theme.Sz(710, 0);
+            intro.Margin = Theme.P(0, 0, 0, 14);
             add(intro, 0, 3); row++;
 
             add(Lbl("Zero Hour folder"), 0, 1);
-            zh = Theme.TextBox(); zh.Dock = DockStyle.Fill; zh.Text = engine.Settings.ZeroHourPath ?? "";
+            zh = Theme.TextBox(); zh.Anchor = AnchorStyles.Left | AnchorStyles.Right; zh.Text = engine.Settings.ZeroHourPath ?? "";
             zh.TextChanged += (s, e) => Check();
             add(zh, 1, 1);
             var zhButtons = Row(Theme.Button("Browse..."), Theme.Button("Find"));
@@ -55,7 +61,7 @@ namespace ZHLauncher
             zhState = Theme.Label("", 9f); add(zhState, 1, 2); row++;
 
             add(Lbl("Generals folder"), 0, 1);
-            gen = Theme.TextBox(); gen.Dock = DockStyle.Fill; gen.Text = engine.Settings.GeneralsPath ?? "";
+            gen = Theme.TextBox(); gen.Anchor = AnchorStyles.Left | AnchorStyles.Right; gen.Text = engine.Settings.GeneralsPath ?? "";
             gen.TextChanged += (s, e) => Check();
             add(gen, 1, 1);
             var genButtons = Row(Theme.Button("Browse..."));
@@ -64,13 +70,13 @@ namespace ZHLauncher
             genState = Theme.Label("", 9f); add(genState, 1, 2); row++;
 
             add(Lbl("Extra arguments"), 0, 1);
-            extra = Theme.TextBox(); extra.Dock = DockStyle.Fill; extra.Text = engine.Settings.ExtraArgs ?? "";
+            extra = Theme.TextBox(); extra.Anchor = AnchorStyles.Left | AnchorStyles.Right; extra.Text = engine.Settings.ExtraArgs ?? "";
             add(extra, 1, 2); row++;
             var extraHint = Theme.Label("Just for this PC, e.g. -win for a window. The pack can add its own for everyone.", 9f, FontStyle.Regular, Theme.Muted);
             add(extraHint, 1, 2); row++;
 
             add(Lbl("Mouse"), 0, 1);
-            mouse = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.Panel2, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat, Width = 260, Margin = new Padding(3, 3, 3, 12) };
+            mouse = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.Panel2, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat, Width = Theme.S(260), Margin = Theme.P(3, 3, 3, 12) };
             mouse.Items.AddRange(new object[] { "Classic (the game's default)", "Reforged" });
             mouse.SelectedIndex = string.Equals(engine.Settings.Mouse, "reforged", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             add(mouse, 1, 2); row++;
@@ -81,29 +87,28 @@ namespace ZHLauncher
             {
                 Text = packAddons.Count == 0 ? "Use the pack's add-ons (the pack has none)" : "Use the pack's add-ons: " + string.Join(", ", packAddons),
                 Checked = !engine.Settings.NoAddons, AutoSize = true, ForeColor = Theme.Text, BackColor = Theme.Panel,
-                Font = Theme.Ui(9.75f), Margin = new Padding(3, 4, 3, 2),
+                Font = Theme.Ui(9.75f), Margin = Theme.P(3, 4, 3, 2),
             };
             add(addons, 1, 2); row++;
             var addonsHint = Theme.Label("HD textures and the like. Off saves disk and video memory; it does not change who you can play with.", 9f, FontStyle.Regular, Theme.Muted);
-            addonsHint.Margin = new Padding(3, 0, 3, 12);
+            addonsHint.Margin = Theme.P(3, 0, 3, 12);
             add(addonsHint, 1, 2); row++;
 
             add(Lbl("On this PC"), 0, 1);
             baseState = Theme.Label("", 9f);
-            baseState.MaximumSize = new Size(440, 0);
+            baseState.MaximumSize = Theme.Sz(440, 0);
             add(baseState, 1, 1);
             var dataButtons = Row(Theme.Button("Open"));
             dataButtons.Controls[0].Click += (s, e) => { try { Process.Start(new ProcessStartInfo(engine.DataRoot) { UseShellExecute = true }); } catch { } };
             add(dataButtons, 2, 1); row++;
 
-            var spacer = new Panel { Height = 10, Dock = DockStyle.Fill, BackColor = Theme.Panel };
-            int spacerRow = row;
+            var spacer = new Panel { Height = Theme.S(10), Width = Theme.S(10), BackColor = Theme.Panel, Margin = new Padding(0) };
             add(spacer, 0, 3); row++;
 
             copy = Theme.Button("Copy Zero Hour into the launcher", true);
             copy.Font = Theme.Ui(10.5f, FontStyle.Bold);
             copy.AutoSize = true;
-            copy.Padding = new Padding(14, 8, 14, 8);
+            copy.Padding = Theme.P(14, 8, 14, 8);
             copy.Click += (s, e) => { if (Save(true)) { CopyRequested = true; DialogResult = DialogResult.OK; } };
             var save = Theme.Button("Save");
             save.Click += (s, e) => { if (Save(false)) DialogResult = DialogResult.OK; };
@@ -116,7 +121,7 @@ namespace ZHLauncher
 
             t.RowCount = row;
             for (int i = 0; i < row; i++)
-                t.RowStyles.Add(i == spacerRow ? new RowStyle(SizeType.Percent, 100) : new RowStyle(SizeType.AutoSize));
+                t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(t);
             if (string.IsNullOrWhiteSpace(zh.Text)) Find(); else Check();
         }
@@ -124,13 +129,13 @@ namespace ZHLauncher
         static Label Lbl(string text)
         {
             var l = Theme.Label(text, 9.75f, FontStyle.Bold);
-            l.Margin = new Padding(0, 6, 8, 0);
+            l.Margin = Theme.P(0, 6, 8, 0);
             return l;
         }
 
         static FlowLayoutPanel Row(params Control[] cs)
         {
-            var f = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, BackColor = Theme.Panel, Margin = new Padding(8, 0, 0, 0) };
+            var f = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, BackColor = Theme.Panel, Margin = Theme.P(8, 0, 0, 0) };
             foreach (var c in cs) f.Controls.Add(c);
             return f;
         }
@@ -179,7 +184,7 @@ namespace ZHLauncher
 
         static void State(Label l, string text, Color c)
         {
-            l.Text = text; l.ForeColor = c; l.MaximumSize = new Size(440, 0);
+            l.Text = text; l.ForeColor = c; l.MaximumSize = Theme.Sz(440, 0);
         }
 
         bool Save(bool forCopy)

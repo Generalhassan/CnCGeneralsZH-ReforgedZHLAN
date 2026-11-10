@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -5,6 +6,15 @@ namespace ZHLauncher
 {
     static class Theme
     {
+        // The launcher is DPI aware (Program.Main), so fonts in points already come out at the
+        // screen's size. Pixel numbers in the layout go through S() so they grow with it too:
+        // 1.0 at 100 % display scaling, 1.5 at 150 %.
+        public static float Dpi = 1f;
+        public static int S(int px) { return (int)Math.Round(px * Dpi); }
+        public static Padding P(int l, int t, int r, int b) { return new Padding(S(l), S(t), S(r), S(b)); }
+        public static Size Sz(int w, int h) { return new Size(S(w), S(h)); }
+        public static Point Pt(int x, int y) { return new Point(S(x), S(y)); }
+
         public static readonly Color Back = Color.FromArgb(14, 18, 27);
         public static readonly Color Panel = Color.FromArgb(22, 28, 41);
         public static readonly Color Panel2 = Color.FromArgb(31, 39, 56);
@@ -32,8 +42,8 @@ namespace ZHLauncher
                 Font = primary ? Ui(13f, FontStyle.Bold) : Ui(9.75f),
                 AutoSize = !primary,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(10, 4, 10, 4),
-                Margin = new Padding(0, 0, 8, 0),
+                Padding = Theme.P(10, 4, 10, 4),
+                Margin = Theme.P(0, 0, 8, 0),
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false,
             };
@@ -53,7 +63,7 @@ namespace ZHLauncher
                 Font = Ui(size, style),
                 ForeColor = color ?? Text,
                 BackColor = Color.Transparent,
-                Margin = new Padding(0, 0, 0, 4),
+                Margin = Theme.P(0, 0, 0, 4),
             };
         }
 

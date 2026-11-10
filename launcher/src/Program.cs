@@ -22,6 +22,7 @@ namespace ZHLauncher
         static void Main(string[] args)
         {
             try { SetProcessDPIAware(); } catch { }
+            try { using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero)) Theme.Dpi = Math.Max(1f, g.DpiX / 96f); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -31,6 +32,7 @@ namespace ZHLauncher
             {
                 if (args[i] == "--pack") pack = args[++i];
                 else if (args[i] == "--data") data = args[++i];
+                else if (args[i] == "--scale") Theme.Dpi = float.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
             }
 
             Engine engine;

@@ -23,8 +23,8 @@ namespace ZHLauncher
             WrapContents = false;
             AutoScroll = true;
             BackColor = Theme.Panel;
-            Padding = new Padding(0);
-            Margin = new Padding(0);
+            Padding = Theme.P(0, 0, 0, 0);
+            Margin = Theme.P(0, 0, 0, 0);
             Resize += (s, e) => FitWidths();
         }
 
@@ -55,7 +55,7 @@ namespace ZHLauncher
 
         void FitWidths()
         {
-            int w = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 2;
+            int w = ClientSize.Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - Theme.S(2);
             foreach (Control c in Controls) c.Width = Math.Max(100, w);
         }
 
@@ -70,8 +70,8 @@ namespace ZHLauncher
                 this.owner = owner;
                 Preset = p;
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
-                Height = (int)Math.Round(58 * DeviceScale());
-                Margin = new Padding(0, 0, 0, 6);
+                Height = Theme.S(58);
+                Margin = Theme.P(0, 0, 0, 6);
                 Cursor = Cursors.Hand;
                 ContextMenuStrip = owner.CardMenu;
                 MouseEnter += (s, e) => { hot = true; Invalidate(); };
@@ -80,10 +80,6 @@ namespace ZHLauncher
                 DoubleClick += (s, e) => { if (owner.Enabled && owner.ItemActivated != null) owner.ItemActivated(owner, EventArgs.Empty); };
             }
 
-            float DeviceScale()
-            {
-                using (var g = CreateGraphics()) return g.DpiX / 96f;
-            }
 
             protected override void OnPaint(PaintEventArgs e)
             {
@@ -91,8 +87,8 @@ namespace ZHLauncher
                 var g = e.Graphics;
                 var r = ClientRectangle;
                 using (var bg = new SolidBrush(sel ? Theme.Line : hot ? Color.FromArgb(37, 46, 66) : Theme.Panel2)) g.FillRectangle(bg, r);
-                if (sel) using (var accent = new SolidBrush(Theme.Gold)) g.FillRectangle(accent, 0, 0, 4, r.Height);
-                float s = DeviceScale();
+                if (sel) using (var accent = new SolidBrush(Theme.Gold)) g.FillRectangle(accent, 0, 0, Theme.S(4), r.Height);
+                float s = Theme.Dpi;
                 int pad = (int)(14 * s);
                 var tf = TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
                 using (var f1 = Theme.Ui(11f, FontStyle.Bold))
