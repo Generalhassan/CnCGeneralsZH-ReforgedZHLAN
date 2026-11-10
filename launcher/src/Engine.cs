@@ -270,13 +270,16 @@ namespace ZHLauncher
                         var j = Json.Load<ModJson>(mj);
                         if (!string.IsNullOrWhiteSpace(j.Name)) m.Label = (j.Name + " " + (j.Version ?? "")).Trim();
                         m.IsPatch = j.Patch;
+                        if (j.Exclude != null) m.Exclude = j.Exclude.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
                     }
                     catch (Exception e) { Log("mod.json in " + d + ": " + e.Message); }
                 }
                 list.Add(m);
             }
-            foreach (var f in Directory.GetFiles(dir, "*.big"))
+            foreach (var f in Directory.GetFiles(dir))
             {
+                // a single archive is a mod too, whatever it is called: .big, or .gib, .ctr and the like
+                if (!f.EndsWith(".big", StringComparison.OrdinalIgnoreCase) && !IsBigArchive(f)) continue;
                 var name = Path.GetFileName(f);
                 list.Add(new ModInfo { Name = name, Label = Path.GetFileNameWithoutExtension(f), PackPath = f, IsFile = true });
             }
@@ -647,7 +650,102 @@ namespace ZHLauncher
 
         // ------------------------------------------------------------------ mods
 
-        public string LocalModPath(ModInfo m) { return Path.Combine(LocalModsDir, m.Name); }
+        // a single-archive mod is kept as .big on this PC, whatever the pack calls it
+        string LocalModName(ModInfo m) { return m.IsFile ? Path.ChangeExtension(m.Name, ".big") : m.Name; }
+        public string LocalModPath(ModInfo m) { return Path.Combine(LocalModsDir, LocalModName(m)); }
+
+        // Mods arrive the way their authors or GenLauncher keep them: archives called .gib (ShockWave) or
+        // .ctr (Contra) so the game does not load them by itself, the mod's own launcher and exe next to
+        // them. 3.6.0's -mod reads *.big only, so the copy on this PC names every archive .big, found by
+        // its BIGF/BIG4 header the way GenLauncher does, and leaves programs out (Contra's generals.ctr
+        // is an exe). mod.json's "exclude" drops what else the pack does not want.
+        static readonly HashSet<string> SkipExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { ".exe", ".dll", ".ico", ".enb", ".lnk", ".url", ".bat", ".cmd", ".ps1", ".vbs", ".msi", ".scr", ".asi" };
+
+        static byte[] Head(string file)
+        {
+            try
+            {
+                using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var b = new byte[4];
+                    int n = fs.Read(b, 0, 4);
+                    return n == 4 ? b : new byte[0];
+                }
+            }
+            catch { return new byte[0]; }
+        }
+
+        public static bool IsBigArchive(string file)
+        {
+            var h = Head(file);
+            return h.Length == 4 && h[0] == 'B' && h[1] == 'I' && h[2] == 'G' && (h[3] == 'F' || h[3] == '4');
+        }
+
+        static bool IsProgram(string file)
+        {
+            var h = Head(file);
+            return h.Length >= 2 && h[0] == 'M' && h[1] == 'Z';
+        }
+
+        static bool WildMatch(string text, string pattern)
+        {
+            var rx = "^" + Regex.Escape(pattern.Replace('/', '\\')).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+            return Regex.IsMatch(text.Replace('/', '\\'), rx, RegexOptions.IgnoreCase);
+        }
+
+        // GenLauncher keeps a mod as <mod>\<version>\files: a folder that holds nothing but one other
+        // folder is looked through, so "ShockWave\1.201 GenLauncher Fix 1" works copied either way
+        static readonly HashSet<string> GameFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "Data", "Art", "Window", "Maps", "Movies", "Audio", "Music", "Speech" };
+
+        public static string ContentRoot(string modDir)
+        {
+            var dir = modDir;
+            for (int depth = 0; depth < 3; depth++)
+            {
+                var files = Directory.GetFiles(dir).Where(f => !Path.GetFileName(f).Equals("mod.json", StringComparison.OrdinalIgnoreCase)
+                                                          && !Path.GetFileName(f).StartsWith("readme", StringComparison.OrdinalIgnoreCase)).ToList();
+                var subs = Directory.GetDirectories(dir);
+                if (files.Count == 0 && subs.Length == 1 && !GameFolders.Contains(Path.GetFileName(subs[0]))) dir = subs[0];
+                else break;
+            }
+            return dir;
+        }
+
+        // pack file -> its relative path in this PC's copy, or null to leave it out
+        static string LocalRel(string file, string rel, ModInfo m)
+        {
+            var name = Path.GetFileName(rel);
+            if (name.Equals("mod.json", StringComparison.OrdinalIgnoreCase)) return rel;
+            if (m.Exclude.Any(p => WildMatch(rel, p) || WildMatch(name, p))) return null;
+            if (SkipExtensions.Contains(Path.GetExtension(name))) return null;
+            if (IsProgram(file)) return null;
+            if (!name.EndsWith(".big", StringComparison.OrdinalIgnoreCase) && IsBigArchive(file)) return Path.ChangeExtension(rel, ".big");
+            return rel;
+        }
+
+        // What the copy of a folder mod on this PC is made of: (pack file, local file) pairs.
+        public List<KeyValuePair<string, string>> ModFiles(ModInfo m)
+        {
+            var list = new List<KeyValuePair<string, string>>();
+            var local = LocalModPath(m);
+            var outer = Path.GetFullPath(m.PackPath).TrimEnd('\\', '/');
+            var root = Path.GetFullPath(ContentRoot(outer)).TrimEnd('\\', '/');
+            var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // a real .big goes first, so "x.big" beats a "x.gib" next to it
+            var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+                                 .OrderBy(f => f.EndsWith(".big", StringComparison.OrdinalIgnoreCase) ? 0 : 1).ThenBy(f => f, StringComparer.OrdinalIgnoreCase);
+            foreach (var f in files)
+            {
+                var rel = LocalRel(f, f.Substring(root.Length + 1), m);
+                if (rel == null || !taken.Add(rel)) continue;
+                list.Add(new KeyValuePair<string, string>(f, Path.Combine(local, rel)));
+            }
+            var mj = Path.Combine(outer, "mod.json");
+            if (root != outer && File.Exists(mj) && taken.Add("mod.json")) list.Add(new KeyValuePair<string, string>(mj, Path.Combine(local, "mod.json")));
+            return list;
+        }
 
         // Make this PC's copy of each mod match the pack: copy what is new or changed, delete the rest.
         public void SyncMods(List<ModInfo> mods)
@@ -663,14 +761,15 @@ namespace ZHLauncher
                     continue;
                 }
                 if (File.Exists(local)) File.Delete(local);
-                var src = Path.GetFullPath(m.PackPath).TrimEnd('\\', '/');
+                var files = ModFiles(m);
+                if (!files.Any(p => p.Value.EndsWith(".big", StringComparison.OrdinalIgnoreCase)))
+                    throw new Exception(m.Label + ": no game archives in its folder in the pack (files starting with BIGF, " +
+                                        "named .big, .gib, .ctr or the like). If it came as an installer, run that once and copy what it installed.");
                 var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var f in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+                foreach (var p in files)
                 {
-                    var rel = f.Substring(src.Length + 1);
-                    var dst = Path.Combine(local, rel);
-                    wanted.Add(Path.GetFullPath(dst));
-                    if (Changed(f, dst)) copies.Add(Tuple.Create(f, dst, new FileInfo(f).Length));
+                    wanted.Add(Path.GetFullPath(p.Value));
+                    if (Changed(p.Key, p.Value)) copies.Add(Tuple.Create(p.Key, p.Value, new FileInfo(p.Key).Length));
                 }
                 if (Directory.Exists(local))
                 {
@@ -691,10 +790,11 @@ namespace ZHLauncher
             // mods the pack no longer has
             if (Directory.Exists(LocalModsDir))
             {
+                var keep = new HashSet<string>(Mods.Select(LocalModName), StringComparer.OrdinalIgnoreCase);
                 foreach (var e in Directory.GetFileSystemEntries(LocalModsDir))
                 {
                     var name = Path.GetFileName(e);
-                    if (FindMod(name) != null) continue;
+                    if (keep.Contains(name)) continue;
                     if (Directory.Exists(e)) ForceDelete(e); else File.Delete(e);
                 }
             }

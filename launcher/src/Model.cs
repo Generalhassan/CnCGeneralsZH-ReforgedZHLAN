@@ -45,6 +45,9 @@ namespace ZHLauncher
         [DataMember(Name = "name")] public string Name;
         [DataMember(Name = "version")] public string Version;
         [DataMember(Name = "patch")] public bool Patch;
+        // files to leave out, by name or path inside the mod, * and ? allowed: a mod's alternatives
+        // ("!!ContraXBeta2_MusicTheScore.ctr") or extras it ships for its own launcher
+        [DataMember(Name = "exclude")] public List<string> Exclude;
     }
 
     public class ModInfo
@@ -54,6 +57,7 @@ namespace ZHLauncher
         public string PackPath;   // where it is in the pack
         public bool IsFile;       // a single .big
         public bool IsPatch;
+        public List<string> Exclude = new List<string>();
         public override string ToString() { return Label + (IsPatch ? "  (patch)" : ""); }
     }
 
